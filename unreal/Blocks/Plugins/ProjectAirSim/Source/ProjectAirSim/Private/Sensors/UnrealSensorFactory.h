@@ -51,31 +51,27 @@ class PROJECTAIRSIM_API UnrealSensorFactory {
       USceneComponent* CameraParent = Parent;
 
       auto cam_settings = sim_camera.GetCameraSettings();
-      // If gimbal settings are used, attach a spring arm.
-      if (cam_settings.gimbal_setting.lock_pitch ||
-          cam_settings.gimbal_setting.lock_roll ||
-          cam_settings.gimbal_setting.lock_yaw) {
+      // [EOIR_TAN 패치] 짐벌 처리 분기:
+      //  - Chase(추적/뷰포트) 카메라: 붐(-10m) 오프셋이 커서, 원본 USpringArmComponent로
+      //    위치+회전을 '수평 프레임'에서 안정화해야 부드럽게 따라옴(붐이 안 휘둘림).
+      //  - 그 외(측방 Left/Right): SpringArm은 90° yaw에서 비대칭 실패 → 링크 직접 부착 +
+      //    UUnrealCamera::ApplyGimbalStabilization(MoveRobotToUnrealPose에서 sim-동기 호출).
+      const auto& gimbal_set = cam_settings.gimbal_setting;
+      const bool bHasGimbal =
+          gimbal_set.lock_pitch || gimbal_set.lock_roll || gimbal_set.lock_yaw;
+      if (bHasGimbal && Id == "Chase") {
         USpringArmComponent* SpringArm =
             NewObject<USpringArmComponent>(Parent, TEXT("SpringArm0"));
-        // Spring arm attaches directly to parent link with zero arm length,
-        // since it is only used for stabilizing rotations.
         SpringArm->AttachToComponent(
             Parent, FAttachmentTransformRules::SnapToTargetIncludingScale);
-
         SpringArm->TargetArmLength = 0.f;
-        SpringArm->bInheritPitch = !cam_settings.gimbal_setting.lock_pitch;
-        SpringArm->bInheritRoll = !cam_settings.gimbal_setting.lock_roll;
-        SpringArm->bInheritYaw = !cam_settings.gimbal_setting.lock_yaw;
-        // TODO Consider making custom chase cam following logic instead of
-        // relying on USpringArmComponent to handle VTOL orientations.
-
-        // Camera lag causes stuttering because
-        // it is based on UE DeltaTime which is not synchronized with the robot
-        // motion calculated by sim time, so it should be disabled.
+        SpringArm->bInheritPitch = !gimbal_set.lock_pitch;
+        SpringArm->bInheritRoll = !gimbal_set.lock_roll;
+        SpringArm->bInheritYaw = !gimbal_set.lock_yaw;
+        // sim-time과 비동기인 UE DeltaTime 기반 lag는 stuttering 유발 → 비활성.
         SpringArm->bEnableCameraLag = false;
         SpringArm->bEnableCameraRotationLag = false;
         SpringArm->RegisterComponent();
-
         CameraParent = SpringArm;
       }
 

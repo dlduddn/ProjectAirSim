@@ -18,6 +18,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "ImagePackingAsyncTask.h"
 #include "ImageUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -344,6 +345,32 @@ void UUnrealCamera::SetRelativePoseFromNed(
   // stabilization is configured)
   FTransform DesiredPose = UnrealTransform::FromGlobalNed(PoseNed);
   this->SetRelativeTransform(DesiredPose);
+}
+
+void UUnrealCamera::ApplyGimbalStabilization() {
+  // [EOIR_TAN 패치] 2축 짐벌 안정화 (측방 카메라용; 기존 USpringArmComponent 대체).
+  // 카메라 월드자세 = (드론 자세에서 잠금축을 0으로 한 base) ∘ 마운트(origin).
+  //   lock_pitch/roll → 월드 수평 유지, lock_yaw=false → 기수(yaw) 추종.
+  // 호출 시점이 로봇 링크 포즈 갱신 직후라 GetComponentRotation()이 최신값 → 떨림 없음.
+  USceneComponent* ParentComp = GetAttachParent();
+  // SpringArm에 부착된 카메라(예: Chase)는 SpringArm이 위치+회전을 담당 → 건너뜀.
+  if (ParentComp == nullptr ||
+      ParentComp->IsA(USpringArmComponent::StaticClass())) {
+    return;
+  }
+  const auto Settings = SimCamera.GetCameraSettings();
+  const auto& Gimbal = Settings.gimbal_setting;
+  if (Gimbal.lock_pitch || Gimbal.lock_roll || Gimbal.lock_yaw) {
+    const FRotator ParentRot = ParentComp->GetComponentRotation();
+    // FRotator(Pitch, Yaw, Roll): 잠긴 축은 0(월드 기준), 안 잠긴 축은 부모 따라감
+    const FRotator Base(Gimbal.lock_pitch ? 0.f : ParentRot.Pitch,
+                        Gimbal.lock_yaw ? 0.f : ParentRot.Yaw,
+                        Gimbal.lock_roll ? 0.f : ParentRot.Roll);
+    // 마운트 회전(origin)은 NED→Unreal 변환으로 얻어 base에 합성
+    const FQuat MountQuat =
+        UnrealTransform::FromGlobalNed(Settings.origin_setting).GetRotation();
+    SetWorldRotation(Base.Quaternion() * MountQuat);
+  }
 }
 
 void UUnrealCamera::UpdateCameraSettings() {
@@ -719,6 +746,10 @@ void UUnrealCamera::TickComponent(
     SetRelativePoseFromNed(NewPose);
     SimCamera.MarkPoseUpdateAsCompleted();
   }
+
+  // [EOIR_TAN 패치] 짐벌 안정화는 여기(UE 틱)서 하지 않는다 — 로봇 포즈가 sim-time으로
+  // 갱신되는 시점과 비동기라 떨림 발생. 대신 AUnrealRobot::MoveRobotToUnrealPose에서
+  // 링크 이동 직후 ApplyGimbalStabilization()를 호출한다.
 
   if (SimCamera.IsSettingsUpdatePending()) {
     UpdateCameraSettings();

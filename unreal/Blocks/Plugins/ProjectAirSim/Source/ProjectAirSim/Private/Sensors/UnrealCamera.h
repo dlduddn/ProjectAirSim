@@ -105,6 +105,11 @@ class UUnrealCamera : public UUnrealSensor {
   void SetRelativePoseFromNed(
       const microsoft::projectairsim::Transform& PoseNed);
 
+  // [EOIR_TAN 패치] 2축 짐벌 안정화를 매 틱이 아니라 로봇 포즈 갱신과 '동기'해 적용
+  // (AUnrealRobot::MoveRobotToUnrealPose에서 링크 이동 직후 호출). UE-tick↔sim-time
+  // 비동기로 인한 떨림 방지.
+  void ApplyGimbalStabilization();
+
   USceneCaptureComponent2D* GetCaptureComponent(
       const microsoft::projectairsim::ImageType Type, bool bIfActive);
 

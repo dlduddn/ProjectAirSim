@@ -429,6 +429,15 @@ void AUnrealRobot::MoveRobotToUnrealPose(bool bUseCollisionSweep) {
   // SetWorldLocationAndRotation will be handled by the
   // callback AUnrealRobot::OnCollisionHit() with the FHitResult info
 
+  // [EOIR_TAN 패치] 링크 포즈 갱신 '직후' 짐벌 카메라 재정렬 → sim-time 동기, 떨림 방지.
+  {
+    TArray<UUnrealCamera*> Cameras;
+    GetComponents<UUnrealCamera>(Cameras);
+    for (UUnrealCamera* Cam : Cameras) {
+      if (Cam != nullptr) Cam->ApplyGimbalStabilization();
+    }
+  }
+
   bHasUnrealPoseUpdated = true;
 
   // UnrealLogger::Log(projectairsim::LogLevel::kTrace,
