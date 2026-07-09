@@ -110,6 +110,10 @@ class UUnrealCamera : public UUnrealSensor {
   // 비동기로 인한 떨림 방지.
   void ApplyGimbalStabilization();
 
+  // [EOIR_TAN 패치] 이 카메라(특히 측방 oblique)를 CesiumCameraManager에 '뷰'로 등록 →
+  // Cesium이 메인 뷰뿐 아니라 이 방향도 고해상 타일을 스트리밍. 짐벌 직후 sim-동기 호출.
+  void UpdateCesiumView();
+
   USceneCaptureComponent2D* GetCaptureComponent(
       const microsoft::projectairsim::ImageType Type, bool bIfActive);
 
@@ -205,6 +209,9 @@ class UUnrealCamera : public UUnrealSensor {
   UPROPERTY() TArray<UTextureRenderTarget2D*> RenderTargets;
   UPROPERTY() TArray<USceneCaptureComponent2D*> StreamingCaptures;
   int32 StreamingCaptureActiveIdx = 0;
+
+  // [EOIR_TAN 패치] CesiumCameraManager에 등록된 카메라 ID (-1=미등록)
+  int32 CesiumCameraId = -1;
 
   // settings
   std::vector<bool> CameraTypeEnabled;

@@ -434,7 +434,10 @@ void AUnrealRobot::MoveRobotToUnrealPose(bool bUseCollisionSweep) {
     TArray<UUnrealCamera*> Cameras;
     GetComponents<UUnrealCamera>(Cameras);
     for (UUnrealCamera* Cam : Cameras) {
-      if (Cam != nullptr) Cam->ApplyGimbalStabilization();
+      if (Cam != nullptr) {
+        Cam->ApplyGimbalStabilization();
+        Cam->UpdateCesiumView();  // [EOIR_TAN] Cesium LOD 뷰 등록(측방 고해상)
+      }
     }
   }
 

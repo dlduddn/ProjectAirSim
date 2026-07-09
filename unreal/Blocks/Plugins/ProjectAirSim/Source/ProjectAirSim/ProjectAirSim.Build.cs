@@ -125,7 +125,8 @@ public class ProjectAirSim : ModuleRules
                 "Projects",  // default
                 "ProceduralMeshComponent",
                 "PixelStreaming",
-                "SunPosition"
+                "SunPosition",
+                "CesiumRuntime"  // [EOIR_TAN] CesiumCameraManager(측방 카메라 고해상)
                 // ... add private dependencies that you statically link with here ...
             }
         );

@@ -14,6 +14,9 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+// [EOIR_TAN 패치] CesiumCameraManager 등록용 (측방/하방 카메라 고해상 스트리밍)
+#include "CesiumCamera.h"
+#include "CesiumCameraManager.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
@@ -370,6 +373,30 @@ void UUnrealCamera::ApplyGimbalStabilization() {
     const FQuat MountQuat =
         UnrealTransform::FromGlobalNed(Settings.origin_setting).GetRotation();
     SetWorldRotation(Base.Quaternion() * MountQuat);
+  }
+}
+
+void UUnrealCamera::UpdateCesiumView() {
+  // [EOIR_TAN 패치] 이 카메라(측방 oblique 등)를 CesiumCameraManager에 '뷰'로 등록 →
+  // Cesium이 그 방향의 고해상 타일을 스트리밍(메인 뷰만 고해상이던 한계 해결).
+  // 짐벌 직후 호출되어 등록 뷰가 실제 캡처 포즈와 sim-동기. 비스트리밍 카메라는 skip.
+  USceneCaptureComponent2D* Cap = GetActiveStreamingCapture();
+  if (Cap == nullptr || Cap->TextureTarget == nullptr) return;
+
+  ACesiumCameraManager* CamMgr =
+      ACesiumCameraManager::GetDefaultCameraManager(GetWorld());
+  if (CamMgr == nullptr) return;
+
+  const FVector2D ViewportSize(
+      static_cast<double>(Cap->TextureTarget->SizeX),
+      static_cast<double>(Cap->TextureTarget->SizeY));
+  const FCesiumCamera CesiumCam(ViewportSize, Cap->GetComponentLocation(),
+                                Cap->GetComponentRotation(),
+                                static_cast<double>(Cap->FOVAngle));
+  if (CesiumCameraId < 0) {
+    CesiumCameraId = CamMgr->AddCamera(CesiumCam);
+  } else {
+    CamMgr->UpdateCamera(CesiumCameraId, CesiumCam);
   }
 }
 
