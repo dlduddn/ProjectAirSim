@@ -70,10 +70,11 @@ class ROS2Node(node.ROSNode):
             rectification_matrix,
             projection_matrix,
         ):
-            camera_info.d = distortion_params
-            camera_info.k = intrinsic_camera_matrix
-            camera_info.r = rectification_matrix
-            camera_info.p = projection_matrix
+            # ROS2 는 float 만 허용 → 왜곡계수/행렬이 정수(0,1)로 오면 assert 실패하므로 캐스팅
+            camera_info.d = [float(x) for x in distortion_params]
+            camera_info.k = [float(x) for x in intrinsic_camera_matrix]
+            camera_info.r = [float(x) for x in rectification_matrix]
+            camera_info.p = [float(x) for x in projection_matrix]
 
     class Subscriber(node.ROSNode.Subscriber):
         """
